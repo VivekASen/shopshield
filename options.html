@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ShopShield Options</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding:12px; max-width:700px; }
+    input[type="text"] { width:300px; padding:6px; }
+    button { padding:6px 10px; margin-left:6px; }
+    ul { margin-top:10px; }
+    li { margin:6px 0; }
+  </style>
+</head>
+<body>
+  <h2>ShopShield — Options</h2>
+  <div>
+    <label>Whitelist domain (prevent blocking on this domain):</label><br/>
+    <input id="domainInput" type="text" placeholder="e.g. www.example.com or example.com" />
+    <button id="addDomain">Add</button>
+  </div>
+
+  <h3>Whitelisted domains</h3>
+  <ul id="whitelist">Loading...</ul>
+
+  <script>
+    const domainInput = document.getElementById('domainInput');
+    const addDomain = document.getElementById('addDomain');
+    const whitelistEl = document.getElementById('whitelist');
+
+    async function load() {
+      const data = await new Promise(res => chrome.storage.local.get(['settings'], r => res(r)));
+      const settings = data.settings || { enabled: true, delaySeconds: 60, whitelistDomains: [] };
+      render(settings.whitelistDomains || []);
+    }
+
+    function render(list) {
+      whitelistEl.innerHTML = '';
+      if (!list.length) {
+        whitelistEl.textContent = 'No whitelisted domains.';
+        return;
+      }
+      list.forEach((d, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `${d} <button data-i="${i}">Remove</button>`;
+        whitelistEl.appendChild(li);
+      });
+
+      whitelistEl.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const idx = Number(e.target.dataset.i);
+          const data = await new Promise(res => chrome.storage.local.get(['settings'], r => res(r)));
+          const settings = data.settings || { enabled: true, delaySeconds: 60, whitelistDomains: [] };
+          settings.whitelistDomains.splice(idx, 1);
+          await new Promise(res => chrome.storage.local.set({ settings }, () => res()));
+          load();
+        });
+      });
+    }
+
+    addDomain.addEventListener('click', async () => {
+      const domain = domainInput.value.trim();
+      if (!domain) return alert('Enter a domain.');
+      const data = await new Promise(res => chrome.storage.local.get(['settings'], r => res(r)));
+      const settings = data.settings || { enabled: true, delaySeconds: 60, whitelistDomains: [] };
+      if (!settings.whitelistDomains) settings.whitelistDomains = [];
+      settings.whitelistDomains.push(domain);
+      await new Promise(res => chrome.storage.local.set({ settings }, () => res()));
+      domainInput.value = '';
+      load();
+    });
+
+    load();
+  </script>
+</body>
+</html>

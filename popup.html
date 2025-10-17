@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ShopShield</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      width: 320px;
+      padding: 12px;
+    }
+    h2 {
+      font-size: 16px;
+      margin-top: 0;
+    }
+    button, input[type="number"] {
+      margin-top: 6px;
+      padding: 6px;
+      font-size: 14px;
+    }
+    #log {
+      margin-top: 12px;
+      font-size: 13px;
+      max-height: 180px;
+      overflow-y: auto;
+      border-top: 1px solid #ddd;
+      padding-top: 6px;
+    }
+    .small {
+      color: #666;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🛍️ ShopShield</h2>
+
+  <label>
+    <input type="checkbox" id="enabled" />
+    Enable mindful checkout block
+  </label>
+
+  <div>
+    <label for="delay">Pause time (seconds):</label><br>
+    <input type="number" id="delay" min="5" max="300" step="5" value="60" />
+  </div>
+
+  <button id="clearLogs">Clear reflection logs</button>
+
+  <div id="status" class="small"></div>
+
+  <div id="log"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
