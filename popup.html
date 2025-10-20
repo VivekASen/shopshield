@@ -2,54 +2,139 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>ShopShield</title>
+  <title>ShopShield — Settings</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      width: 320px;
-      padding: 12px;
-    }
-    h2 {
-      font-size: 16px;
-      margin-top: 0;
-    }
-    button, input[type="number"] {
-      margin-top: 6px;
-      padding: 6px;
-      font-size: 14px;
-    }
-    #log {
-      margin-top: 12px;
-      font-size: 13px;
-      max-height: 180px;
-      overflow-y: auto;
-      border-top: 1px solid #ddd;
-      padding-top: 6px;
-    }
-    .small {
-      color: #666;
-      font-size: 12px;
-    }
+    :root { --base-font:13px; --muted:#666; --pill-bg:#eef6ff; --pill-color:#0b66c3; --danger:#b33; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; font-size: var(--base-font); width: 380px; padding: 10px; box-sizing: border-box; color:#111; }
+    h2 { font-size:15px; margin:4px 0 10px 0; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .small { font-size:12px; color:var(--muted); }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .section { margin-top:8px; }
+    input[type="number"], select, button, input[type="password"], textarea { font-size:13px; padding:6px; }
+    button { cursor:pointer; border-radius:6px; }
+    .muted { color:var(--muted); font-size:12px; margin-top:6px; }
+    .override-item { margin-bottom:8px; padding:6px; border-radius:6px; background:#fafafa; border:1px solid #f0f0f0; display:flex; justify-content:space-between; align-items:center; font-size:13px; }
+    #log { margin-top:10px; font-size:13px; max-height:110px; overflow-y:auto; border-top:1px solid #eee; padding-top:8px; }
+    .reason-pill { background:var(--pill-bg); color:var(--pill-color); padding:4px 8px; border-radius:12px; font-size:12px; border:1px solid #d7e7ff; max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .locked-overlay { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+    .sensitive { opacity:1; }
+    .sensitive.disabled { opacity:0.5; pointer-events:none; filter:grayscale(0.2); }
+    .auth-box { margin-top:8px; border:1px solid #eee; padding:8px; border-radius:6px; background:#fafafa; }
+    label { font-size:13px; display:block; margin-bottom:6px; }
+    .danger { color:var(--danger); }
+    .session-row { display:flex; gap:8px; align-items:center; margin-top:6px; }
+    #sessionTimer { font-weight:600; }
+    .tiny { font-size:11px; color:var(--muted); }
+    textarea { width:100%; height:84px; resize:vertical; }
   </style>
 </head>
 <body>
-  <h2>🛍️ ShopShield</h2>
+  <h2>
+    <span>🛍️ ShopShield</span>
+    <span id="lockStatus" class="small">Locked</span>
+  </h2>
 
-  <label>
-    <input type="checkbox" id="enabled" />
-    Enable mindful checkout block
-  </label>
+  <!-- Auth area -->
+  <div id="authArea" class="auth-box">
+    <div id="setPasswordArea">
+      <label>Set a password (required to change sensitive settings)</label>
+      <input id="newPassword" type="password" placeholder="New password or PIN" style="width:58%;" />
+      <input id="newPasswordConfirm" type="password" placeholder="Confirm" style="width:38%;" />
+      <div style="margin-top:6px;">
+        <button id="setPasswordBtn">Set password</button>
+        <button id="removePasswordBtn" style="margin-left:6px;">Remove password</button>
+      </div>
+      <div class="tiny muted" style="margin-top:6px;">If no password is set, extension is unprotected. Removing password requires the current password.</div>
+    </div>
 
-  <div>
-    <label for="delay">Pause time (seconds):</label><br>
-    <input type="number" id="delay" min="5" max="300" step="5" value="60" />
+    <div id="unlockArea" style="margin-top:8px;">
+      <label>Unlock</label>
+      <input id="unlockPassword" type="password" placeholder="Enter password" style="width:65%;" />
+      <button id="unlockBtn">Unlock</button>
+      <button id="logoutBtn" style="margin-left:6px; display:none;">Lock</button>
+      <div class="session-row">
+        <input id="persistUntilClose" type="checkbox" /> <label for="persistUntilClose" class="tiny">Remember unlock until browser close (if supported)</label>
+      </div>
+      <div id="authMsg" class="small muted" style="margin-top:6px;">Session expires after 15 minutes by default.</div>
+      <div style="margin-top:6px;">
+        <span class="tiny">Session remaining: <span id="sessionTimer">—</span></span>
+      </div>
+    </div>
+
+    <div id="changePasswordArea" style="margin-top:8px; display:none;">
+      <label>Change password</label>
+      <input id="changeOld" type="password" placeholder="Current password" style="width:48%;" />
+      <input id="changeNew" type="password" placeholder="New password" style="width:48%;" />
+      <div style="margin-top:6px;">
+        <button id="changePasswordBtn">Change password</button>
+      </div>
+    </div>
+
+    <div style="margin-top:8px; border-top:1px dashed #eee; padding-top:8px;">
+      <label>Parental PIN recovery (offline)</label>
+      <div class="tiny muted">Export a recovery code to store offline. Import it to restore/reset the password. Keep it secret.</div>
+      <div style="margin-top:6px; display:flex; gap:6px;">
+        <button id="exportRecoveryBtn">Export recovery code</button>
+        <button id="importRecoveryBtn">Import recovery code</button>
+      </div>
+      <textarea id="recoveryArea" placeholder="Paste recovery JSON here to import" style="display:none;"></textarea>
+      <div style="margin-top:6px;">
+        <button id="importRecoveryConfirm" style="display:none;">Confirm import</button>
+      </div>
+    </div>
+
   </div>
 
-  <button id="clearLogs">Clear reflection logs</button>
+  <!-- Basic controls -->
+  <div class="section">
+    <label for="delay">Pause time (seconds):</label><br>
+    <input type="number" id="delay" min="5" max="300" step="5" value="60" />
+    <div class="muted">How long the pause modal waits before allowing the page to continue.</div>
+  </div>
 
-  <div id="status" class="small"></div>
+  <div class="section">
+    <label for="sensitivity">Detection sensitivity:</label><br>
+    <select id="sensitivity">
+      <option value="aggressive">Aggressive</option>
+      <option value="normal">Normal</option>
+      <option value="conservative">Conservative</option>
+    </select>
+    <div class="muted">Controls how strictly ShopShield decides a page is a checkout/cart page.</div>
+  </div>
 
-  <div id="log"></div>
+  <div class="section row">
+    <button id="clearLogs">🗑️ Clear logs</button>
+    <button id="clearOverrides" class="sensitive">🚫 Clear overrides</button>
+    <button id="clearWhitelist" class="sensitive">🛡️ Clear whitelist</button>
+    <button id="whitelistCurrent" class="sensitive">✅ Whitelist current site</button>
+  </div>
+
+  <div class="section meta-row" style="margin-top:10px;">
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="collapsible-btn" data-target="log">Reflection logs ▼</button>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="small">Last modal reason:</div>
+      <div id="currentReason" class="reason-pill" title="Last detected reason for showing the modal on this site">—</div>
+    </div>
+  </div>
+
+  <div id="log">Loading...</div>
+
+  <div class="section">
+    <h4 class="collapsible-btn" data-target="overridesList">Active overrides ▼</h4>
+    <div id="overridesList" style="max-height:110px; overflow-y:auto; border-top:1px dashed #eee; padding-top:8px;">Loading...</div>
+  </div>
+
+  <div class="section">
+    <h4 class="collapsible-btn" data-target="whitelistList">Whitelisted sites ▼</h4>
+    <div id="whitelistList" style="max-height:110px; overflow-y:auto; border-top:1px dashed #eee; padding-top:8px;">Loading...</div>
+  </div>
+
+  <div style="margin-top:10px; font-size:12px;" class="small muted">
+    Tip: password protection is a deterrent for casual changes. It does not prevent someone who can edit the extension files or chrome.storage from bypassing it.
+  </div>
 
   <script src="popup.js"></script>
 </body>
