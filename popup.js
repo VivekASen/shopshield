@@ -1,5 +1,5 @@
-// popup.js — extended: session timer, remember-until-close, offline recovery export/import, protect the enable toggle
-// NOTE: client-side deterrent only. Keep recovery code secret if you export it.
+// popup.js — extended: session timer, remember-until-close, protect the enable toggle
+// NOTE: client-side deterrent only.
 
 // --- configuration ---
 const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes default
@@ -9,7 +9,7 @@ const SALT_BYTES = 16;
 
 // --- DOM refs ---
 const delayInput = document.getElementById("delay");
-const clearBtn = document.getElementById("clearLogs");
+// const clearBtn = document.getElementById("clearLogs");
 const clearOverridesBtn = document.getElementById("clearOverrides");
 const clearWhitelistBtn = document.getElementById("clearWhitelist");
 const whitelistCurrentBtn = document.getElementById("whitelistCurrent");
@@ -34,12 +34,6 @@ const changePasswordArea = document.getElementById("changePasswordArea");
 const changeOld = document.getElementById("changeOld");
 const changeNew = document.getElementById("changeNew");
 const changePasswordBtn = document.getElementById("changePasswordBtn");
-
-// recovery UI
-const exportRecoveryBtn = document.getElementById("exportRecoveryBtn");
-const importRecoveryBtn = document.getElementById("importRecoveryBtn");
-const recoveryArea = document.getElementById("recoveryArea");
-const importRecoveryConfirm = document.getElementById("importRecoveryConfirm");
 
 // --- crypto helpers ---
 function b64FromArrayBuffer(buf) {
@@ -234,27 +228,15 @@ function friendlyReason(reasonObj) {
 async function renderUIState() {
   // ensure defaults
   const defaults = {};
-  const d = await storageGet(["enabled","delaySeconds","reflectionLogs","overrides","overrideExpiryHours","whitelist","sensitivity","lastModalReason","shopshield_password"]);
+  const d = await storageGet(["enabled","delaySeconds","overrides","overrideExpiryHours","whitelist","sensitivity","shopshield_password"]);
   if (typeof d.enabled === "undefined") defaults.enabled = true;
   if (typeof d.delaySeconds === "undefined") defaults.delaySeconds = 60;
   if (typeof d.sensitivity === "undefined") defaults.sensitivity = "normal";
   if (Object.keys(defaults).length) await storageSet(defaults);
 
-  const data = await storageGet(["enabled","delaySeconds","reflectionLogs","overrides","overrideExpiryHours","whitelist","sensitivity","lastModalReason","shopshield_password"]);
+  const data = await storageGet(["enabled","delaySeconds","overrides","overrideExpiryHours","whitelist","sensitivity","shopshield_password"]);
   delayInput.value = data.delaySeconds ?? 60;
   sensitivitySelect.value = data.sensitivity || "normal";
-
-  // logs
-  logDiv.innerHTML = "";
-  const logs = data.reflectionLogs || [];
-  if (!logs.length) logDiv.textContent = "No reflections yet.";
-  else logs.forEach(entry => {
-    const div = document.createElement("div");
-    const time = new Date(entry.timestamp).toLocaleString();
-    div.style.marginBottom = "8px";
-    div.innerHTML = `<div style="font-weight:600;">${escapeHtml(entry.text)}</div><div class="small">${escapeHtml(time)} — ${escapeHtml(entry.url)}</div>`;
-    logDiv.appendChild(div);
-  });
 
   // overrides
   overridesList.innerHTML = "";
@@ -310,17 +292,17 @@ async function renderUIState() {
     whitelistList.appendChild(container);
   });
 
-  // last modal reason for active tab
-  try {
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (!tabs || !tabs[0] || !tabs[0].url) { currentReasonEl.textContent = "—"; return; }
-      try {
-        const origin = new URL(tabs[0].url).origin;
-        const map = data.lastModalReason || {};
-        currentReasonEl.textContent = map[origin] ? friendlyReason(map[origin]) : "—";
-      } catch (e) { currentReasonEl.textContent = "—"; }
-    });
-  } catch (e) { currentReasonEl.textContent = "—"; }
+  // last modal reason for active tab (optional)
+  // try {
+  //   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+  //     if (!tabs || !tabs[0] || !tabs[0].url) { currentReasonEl.textContent = "—"; return; }
+  //     try {
+  //       const origin = new URL(tabs[0].url).origin;
+  //       const map = data.lastModalReason || {};
+  //       currentReasonEl.textContent = map[origin] ? friendlyReason(map[origin]) : "—";
+  //     } catch (e) { currentReasonEl.textContent = "—"; }
+  //   });
+  // } catch (e) { currentReasonEl.textContent = "—"; }
 }
 
 // --- UI wiring & protected actions ---
@@ -337,12 +319,6 @@ async function attachHandlers() {
   delayInput.addEventListener("change", async () => {
     const v = parseInt(delayInput.value) || 60;
     await storageSet({ delaySeconds: v });
-    await renderUIState();
-  });
-
-  // clear logs (not protected)
-  clearBtn.addEventListener("click", async () => {
-    await storageSet({ reflectionLogs: [] });
     await renderUIState();
   });
 
@@ -456,55 +432,6 @@ async function attachHandlers() {
     }
   });
 
-  // export recovery code (offline)
-  exportRecoveryBtn.addEventListener("click", async () => {
-    const pwExists = await passwordExists();
-    if (!pwExists) { alert("No password set to export."); return; }
-    const d = await storageGet(["shopshield_password"]);
-    const payload = d.shopshield_password;
-    if (!payload) { alert("Nothing to export."); return; }
-    // show JSON in a modal textarea (or copy to clipboard)
-    const json = JSON.stringify({ shopshield_password: payload });
-    // attempt to copy to clipboard then show the code in recoveryArea
-    try {
-      await navigator.clipboard.writeText(json);
-      alert("Recovery code copied to clipboard. Save it securely. You can also keep it in the text area below.");
-    } catch (e) {
-      // ignore copy failure
-    }
-    recoveryArea.style.display = "block";
-    recoveryArea.value = json;
-  });
-
-  // import recovery code (show textarea)
-  importRecoveryBtn.addEventListener("click", () => {
-    recoveryArea.style.display = recoveryArea.style.display === "block" ? "none" : "block";
-    importRecoveryConfirm.style.display = recoveryArea.style.display === "block" ? "inline-block" : "none";
-  });
-
-  importRecoveryConfirm.addEventListener("click", async () => {
-    const txt = recoveryArea.value && recoveryArea.value.trim();
-    if (!txt) { alert("Paste recovery JSON into the box first."); return; }
-    try {
-      const obj = JSON.parse(txt);
-      if (!obj || !obj.shopshield_password || !obj.shopshield_password.hash || !obj.shopshield_password.salt) {
-        alert("Invalid recovery code format.");
-        return;
-      }
-      // Overwrite stored shopshield_password with imported one
-      await storageSet({ shopshield_password: obj.shopshield_password });
-      alert("Imported recovery code. Password restored. You may want to unlock now.");
-      recoveryArea.value = "";
-      recoveryArea.style.display = "none";
-      importRecoveryConfirm.style.display = "none";
-      await renderUIState();
-      await updateLockUI();
-    } catch (e) {
-      console.error(e);
-      alert("Import failed: " + (e.message || e));
-    }
-  });
-
   // collapsibles
   const coll = document.querySelectorAll(".collapsible-btn");
   coll.forEach(btn => {
@@ -520,49 +447,88 @@ async function attachHandlers() {
   });
 }
 
-// --- protect enable toggle (popup-level only) ---
-// We don't include the toggle input field in this popup version,
-// but if you had an enable checkbox, you'd verify auth before allowing changes.
-// Example (if you add the checkbox):
-// enabledCheckbox.addEventListener('change', async () => {
-//   if (!await isAuthenticated()) { alert('Unlock to change enable state'); enabledCheckbox.checked = !enabledCheckbox.checked; return; }
-//   await storageSet({ enabled: enabledCheckbox.checked });
-// });
-
-// --- lock UI update ---
+// --- improved lock UI update: hides sensitive elements until unlocked ---
 async function updateLockUI(forceAuthState = null) {
   const exists = await passwordExists();
+  // compute auth state
   const authed = (typeof forceAuthState === "boolean") ? forceAuthState : await isAuthenticated();
-  lockStatus.textContent = authed ? "Unlocked" : "Locked";
-  // show/hide unlock controls
-  if (authed) {
-    unlockPassword.style.display = "none";
-    unlockBtn.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-    changePasswordArea.style.display = "block";
-  } else {
-    unlockPassword.style.display = exists ? "inline-block" : "none";
-    unlockBtn.style.display = exists ? "inline-block" : "none";
-    logoutBtn.style.display = "none";
-    changePasswordArea.style.display = "none";
-  }
-  document.getElementById("setPasswordArea").style.display = exists ? "none" : "block";
 
-  // toggle sensitive UI
-  const sensitiveEls = document.querySelectorAll(".sensitive");
+  // status text
+  lockStatus.textContent = authed ? "Unlocked" : "Locked";
+
+  // show/hide small control areas (these keep previous semantics)
+  if (authed) {
+    if (unlockPassword) unlockPassword.style.display = "none";
+    if (unlockBtn) unlockBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "inline-block";
+    if (changePasswordArea) changePasswordArea.style.display = "block";
+  } else {
+    if (unlockPassword) unlockPassword.style.display = exists ? "inline-block" : "none";
+    if (unlockBtn) unlockBtn.style.display = exists ? "inline-block" : "none";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (changePasswordArea) changePasswordArea.style.display = "none";
+  }
+
+  const setPwdArea = document.getElementById("setPasswordArea");
+  if (setPwdArea) setPwdArea.style.display = exists ? "none" : "block";
+
+  // --- Hide or show all .sensitive elements by toggling a "hidden" class ---
+  const sensitiveEls = Array.from(document.querySelectorAll(".sensitive"));
   sensitiveEls.forEach(el => {
+    const controls = el.querySelectorAll ? Array.from(el.querySelectorAll("input,button,select,textarea,a")) : [];
     if (!authed) {
-      el.classList.add("disabled");
-      el.classList.add("sensitive");
-      el.setAttribute("disabled", "true");
+      // hide visually and make non-focusable
+      el.classList.add("hidden");
+      el.setAttribute("aria-hidden", "true");
+      controls.forEach(c => {
+        c.dataset._savedTabIndex = c.getAttribute("tabindex");
+        c.setAttribute("tabindex", "-1");
+        if (c.hasAttribute("disabled")) c.dataset._wasDisabled = "1";
+        else c.dataset._wasDisabled = "0";
+        c.setAttribute("disabled", "true");
+      });
     } else {
-      el.classList.remove("disabled");
-      el.classList.add("sensitive");
-      el.removeAttribute("disabled");
+      // show and restore focusability
+      el.classList.remove("hidden");
+      el.removeAttribute("aria-hidden");
+      controls.forEach(c => {
+        if (c.dataset._savedTabIndex !== null && typeof c.dataset._savedTabIndex !== "undefined") {
+          if (c.dataset._savedTabIndex === "null") c.removeAttribute("tabindex");
+          else c.setAttribute("tabindex", c.dataset._savedTabIndex);
+        } else {
+          c.removeAttribute("tabindex");
+        }
+        if (c.dataset._wasDisabled === "0") c.removeAttribute("disabled");
+        delete c.dataset._savedTabIndex;
+        delete c.dataset._wasDisabled;
+      });
     }
   });
-  // start/stop session timer
-  if (authed) startSessionTimer(); else { stopSessionTimer(); sessionTimerEl.textContent = "—"; }
+
+  // Optionally collapse long lists: replace content with a small placeholder if it has class `collapsible-placeholder-target`
+  const placeholders = Array.from(document.querySelectorAll(".collapsible-placeholder-target"));
+  placeholders.forEach(el => {
+    if (!authed) {
+      if (!el.dataset._placeholderInserted) {
+        const ph = document.createElement("div");
+        ph.className = "collapsed-placeholder";
+        ph.textContent = "Unlock to view details";
+        ph.dataset._isPlaceholder = "true";
+        el.style.display = "none";
+        el.insertAdjacentElement("afterend", ph);
+        el.dataset._placeholderInserted = "1";
+      }
+    } else {
+      const ph = el.nextElementSibling;
+      if (ph && ph.dataset && ph.dataset._isPlaceholder === "true") ph.remove();
+      el.style.display = "";
+      delete el.dataset._placeholderInserted;
+    }
+  });
+
+  // start/stop session timer (same behavior)
+  if (authed) startSessionTimer();
+  else { stopSessionTimer(); sessionTimerEl.textContent = "—"; }
 }
 
 // --- init ---

@@ -18,8 +18,12 @@
     #log { margin-top:10px; font-size:13px; max-height:110px; overflow-y:auto; border-top:1px solid #eee; padding-top:8px; }
     .reason-pill { background:var(--pill-bg); color:var(--pill-color); padding:4px 8px; border-radius:12px; font-size:12px; border:1px solid #d7e7ff; max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .locked-overlay { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
-    .sensitive { opacity:1; }
+
+    /* --- sensitive hiding + animation --- */
+    .sensitive { transition: opacity .18s ease, max-height .22s ease; opacity: 1; max-height: 1600px; overflow: visible; }
+    .sensitive.hidden { display: none !important; opacity: 0; max-height: 0; overflow: hidden; }
     .sensitive.disabled { opacity:0.5; pointer-events:none; filter:grayscale(0.2); }
+
     .auth-box { margin-top:8px; border:1px solid #eee; padding:8px; border-radius:6px; background:#fafafa; }
     label { font-size:13px; display:block; margin-bottom:6px; }
     .danger { color:var(--danger); }
@@ -27,6 +31,9 @@
     #sessionTimer { font-weight:600; }
     .tiny { font-size:11px; color:var(--muted); }
     textarea { width:100%; height:84px; resize:vertical; }
+
+    /* placeholder for collapsed lists when locked */
+    .collapsed-placeholder { font-size:12px; color:var(--muted); padding:6px 0; }
   </style>
 </head>
 <body>
@@ -62,7 +69,7 @@
       </div>
     </div>
 
-    <div id="changePasswordArea" style="margin-top:8px; display:none;">
+    <div id="changePasswordArea" class="sensitive" style="margin-top:8px; display:none;">
       <label>Change password</label>
       <input id="changeOld" type="password" placeholder="Current password" style="width:48%;" />
       <input id="changeNew" type="password" placeholder="New password" style="width:48%;" />
@@ -70,31 +77,18 @@
         <button id="changePasswordBtn">Change password</button>
       </div>
     </div>
-
-    <div style="margin-top:8px; border-top:1px dashed #eee; padding-top:8px;">
-      <label>Parental PIN recovery (offline)</label>
-      <div class="tiny muted">Export a recovery code to store offline. Import it to restore/reset the password. Keep it secret.</div>
-      <div style="margin-top:6px; display:flex; gap:6px;">
-        <button id="exportRecoveryBtn">Export recovery code</button>
-        <button id="importRecoveryBtn">Import recovery code</button>
-      </div>
-      <textarea id="recoveryArea" placeholder="Paste recovery JSON here to import" style="display:none;"></textarea>
-      <div style="margin-top:6px;">
-        <button id="importRecoveryConfirm" style="display:none;">Confirm import</button>
-      </div>
-    </div>
-
   </div>
 
   <!-- Basic controls -->
-  <div class="section">
+  <div class="section sensitive" id="settingsBlock">
     <label for="delay">Pause time (seconds):</label><br>
     <input type="number" id="delay" min="5" max="300" step="5" value="60" />
     <div class="muted">How long the pause modal waits before allowing the page to continue.</div>
   </div>
 
-  <div class="section">
+  <div class="sensitive" class="section">
     <label for="sensitivity">Detection sensitivity:</label><br>
+    <!-- keep sensitivity as sensitive -->
     <select id="sensitivity">
       <option value="aggressive">Aggressive</option>
       <option value="normal">Normal</option>
@@ -103,37 +97,21 @@
     <div class="muted">Controls how strictly ShopShield decides a page is a checkout/cart page.</div>
   </div>
 
-  <div class="section row">
-    <button id="clearLogs">🗑️ Clear logs</button>
+  <div class="section row sensitive">
+    <!-- <button id="clearLogs">🗑️ Clear logs</button> -->
     <button id="clearOverrides" class="sensitive">🚫 Clear overrides</button>
     <button id="clearWhitelist" class="sensitive">🛡️ Clear whitelist</button>
     <button id="whitelistCurrent" class="sensitive">✅ Whitelist current site</button>
   </div>
 
-  <div class="section meta-row" style="margin-top:10px;">
-    <div style="display:flex; gap:8px; align-items:center;">
-      <button class="collapsible-btn" data-target="log">Reflection logs ▼</button>
-    </div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <div class="small">Last modal reason:</div>
-      <div id="currentReason" class="reason-pill" title="Last detected reason for showing the modal on this site">—</div>
-    </div>
-  </div>
-
-  <div id="log">Loading...</div>
-
   <div class="section">
     <h4 class="collapsible-btn" data-target="overridesList">Active overrides ▼</h4>
-    <div id="overridesList" style="max-height:110px; overflow-y:auto; border-top:1px dashed #eee; padding-top:8px;">Loading...</div>
+    <div id="overridesList" class="sensitive collapsible-placeholder-target" style="max-height:110px; overflow-y:auto; border-top:1px dashed #eee; padding-top:8px;">Loading...</div>
   </div>
 
   <div class="section">
     <h4 class="collapsible-btn" data-target="whitelistList">Whitelisted sites ▼</h4>
-    <div id="whitelistList" style="max-height:110px; overflow-y:auto; border-top:1px dashed #eee; padding-top:8px;">Loading...</div>
-  </div>
-
-  <div style="margin-top:10px; font-size:12px;" class="small muted">
-    Tip: password protection is a deterrent for casual changes. It does not prevent someone who can edit the extension files or chrome.storage from bypassing it.
+    <div id="whitelistList" class="sensitive collapsible-placeholder-target" style="max-height:110px; overflow-y:auto; border-top:1px dashed #eee; padding-top:8px;">Loading...</div>
   </div>
 
   <script src="popup.js"></script>

@@ -518,12 +518,12 @@ async function showDelayModal() {
 
   overrideBtn.addEventListener("click", async () => {
     cleanupAndRemove();
-    try {
-      const d = await chrome.storage.local.get(["reflectionLogs"]);
-      const logs = d.reflectionLogs || [];
-      logs.unshift({ text: "Override clicked", timestamp: Date.now(), url: window.location.href });
-      await chrome.storage.local.set({ reflectionLogs: logs });
-    } catch (e) { console.warn(e); }
+    // try {
+    //   const d = await chrome.storage.local.get(["reflectionLogs"]);
+    //   const logs = d.reflectionLogs || [];
+    //   logs.unshift({ text: "Override clicked", timestamp: Date.now(), url: window.location.href });
+    //   await chrome.storage.local.set({ reflectionLogs: logs });
+    // } catch (e) { console.warn(e); }
     try {
       const origin = location.origin;
       const overrides = await getOverridesObj();
